@@ -14,6 +14,8 @@ module suimon::battle {
 
     // error codes
     const EInvalidBattleInitiator: u64 = 1000;
+    const EInvalidOpponent: u64 = 1001;
+    const EInvalidSender: u64 = 1002;
 
     struct Battle has key {
         id: UID,
@@ -35,6 +37,23 @@ module suimon::battle {
         }
     }
 
+    public fun is_participant(self: &Battle, addr: address): bool {
+        self.coach_a == addr || self.coach_b == addr
+    }
+
+
+    // TODO: come up with a naming convention for entry functions that transition battle state.
+    // maybe something like <verb>_battle.
+    public fun battle_accepted(self: &mut Battle) {
+        assert!(self.state == SETUP, 0);
+        // TODO: extract an action system,
+        //  we need to be able to enforce that a given state is traversible through
+        //  a given action.
+        self.state = SELECTING_SUIMON;
+    }
+
+    // todo: public fun coaches(b: &Battle): (&address, &address)
+
     // the battle object is shared so coach a and coach b can both interact with it (write to it).
     // we need to ensure that only coach a or coach b are allowed to engage with the battle object,
     // and that only coach a may write to coach a suimon and that only coach b may write to coach b suimon.
@@ -43,32 +62,36 @@ module suimon::battle {
     public entry fun initiate_battle(coach_a: address, coach_b: address, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
 
-        if (sender != coach_a && sender != coach_b) {
+        if (sender != coach_a) {
             abort(EInvalidBattleInitiator)
+        };
+        if (coach_a == coach_b) {
+            abort(EInvalidOpponent)
         };
 
         let battle = create(coach_a, coach_b, ctx);
         transfer::share_object(battle);
     }
 
-    public fun is_participant(self: &Battle, addr: address): bool {
-        self.coach_a == addr || self.coach_b == addr
+    public entry fun accept_battle(battle: &mut Battle, ctx: &mut TxContext) {
+        let sender = tx_context::sender(ctx);
+
+        if (sender != battle.coach_b) {
+            abort(EInvalidSender)
+        };
+
+        battle_accepted(battle);
     }
 
-    // todo: public fun coaches(b: &Battle): (&address, &address)
-    
 
     #[test]
     fun test_create() {
-        // use std::debug;
-
         let referree = @0xc0ffee;
         let coach_a = @0xc0a;
         let coach_b = @0xc0b;
         let ctx = tx_context::dummy();
         let battle = create(coach_a, coach_b, &mut ctx);
 
-        // debug::print(&battle);
 
         transfer::transfer(battle, referree);
     }
@@ -76,8 +99,8 @@ module suimon::battle {
     #[test]
     fun test_is_participant() {
         let some_rando = @0xbabe;
-        let coach_a = @0xc0a;
-        let coach_b = @0xc0b;
+        let coach_a = @0xabcd;
+        let coach_b = @0xdcba;
 
         let ctx = tx_context::dummy();
         let battle = create(coach_a, coach_b, &mut ctx);
@@ -93,11 +116,10 @@ module suimon::battle {
 
     #[test]
     fun test_initiate_battle() {
-        use std::debug;
         use sui::test_scenario;
 
-        let coach_a = @0xc0a;
-        let coach_b = @0xc0b;
+        let coach_a = @0xabcd;
+        let coach_b = @0xdbca;
 
         let scenario_val = test_scenario::begin(coach_a);
         let scenario = &mut scenario_val;
@@ -107,10 +129,34 @@ module suimon::battle {
         test_scenario::next_tx(scenario, coach_b);
         {
             let battle = test_scenario::take_shared<Battle>(scenario);
-            debug::print(&battle);
+            assert!(battle.state == 0, 2);
             test_scenario::return_shared(battle);
         };
 
         test_scenario::end(scenario_val);
+    }
+
+    #[test]
+    fun test_accept_battle() {
+        use sui::test_scenario;
+
+        let coach_a = @0xabcd;
+        let coach_b = @0xdbca;
+
+        let scenario_val = test_scenario::begin(coach_a);
+        let scenario = &mut scenario_val;
+        {
+            initiate_battle(coach_a, coach_b, test_scenario::ctx(scenario))
+        };
+        test_scenario::next_tx(scenario, coach_b);
+        {
+            let battle = test_scenario::take_shared<Battle>(scenario);
+            accept_battle(&mut battle, test_scenario::ctx(scenario));
+            assert!(battle.state == 1, 3);
+            test_scenario::return_shared(battle);
+        };
+
+        test_scenario::end(scenario_val);
+
     }
 }
