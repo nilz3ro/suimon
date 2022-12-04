@@ -11,13 +11,18 @@ module suimon::battle {
     const SELECTING_SUIMON: u8 = 1;
     const ACTIVE: u8 = 2;
     const FINISHED: u8 = 3;
+    const DECLINED: u8 = 4;
 
     // error codes
     const EInvalidBattleInitiator: u64 = 1000;
     const EInvalidOpponent: u64 = 1001;
     const EInvalidSender: u64 = 1002;
     const EBattleAlreadyAccepted: u64 = 1003;
-    const EBattleNotInSelectingSuimonState: u64 = 1004;
+    const EBattleNotInSetupState: u64 = 1004;
+    const EBattleNotInSelectingSuimonState: u64 = 1005;
+    const EBattleNotInActiveState: u64 = 1006;
+    const EBattleNotInFinishedState: u64 = 1007;
+    const EBattleNotInDeclinedState: u64 = 1008;
 
 
     struct Battle has key {
@@ -45,14 +50,14 @@ module suimon::battle {
     }
 
 
-    // TODO: come up with a naming convention for entry functions that transition battle state.
-    // maybe something like <verb>_battle.
-    public fun battle_accepted(self: &mut Battle) {
-        assert!(self.state == SETUP, 0);
-        // TODO: extract an action system,
-        //  we need to be able to enforce that a given state is traversible through
-        //  a given action.
+    public fun commit_battle_accept(self: &mut Battle) {
+        assert!(self.state == SETUP, EBattleNotInSetupState);
         self.state = SELECTING_SUIMON;
+    }
+
+    public fun commit_battle_decline(self: &mut Battle) {
+        assert!(self.state == SETUP, EBattleNotInSetupState);
+        self.state = DECLINED;
     }
 
     // todo: public fun coaches(b: &Battle): (&address, &address)
@@ -83,24 +88,17 @@ module suimon::battle {
             abort(EInvalidSender)
         };
 
-        battle_accepted(battle);
+        commit_battle_accept(battle);
     }
 
-    public entry fun decline_battle(battle: Battle, ctx: &mut TxContext) {
+    public entry fun decline_battle(battle: &mut Battle, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
 
         if (sender != battle.coach_b) {
             abort(EInvalidSender)
         };
-        if (battle.state != SETUP) {
-            abort(EBattleAlreadyAccepted)
-        };
 
-        let Battle {id, coach_a: _, coach_b: _, coach_a_suimon, coach_b_suimon, state: _ } = battle;
-
-        vector::destroy_empty(coach_a_suimon);
-        vector::destroy_empty(coach_b_suimon);
-        object::delete(id);
+        commit_battle_decline(battle);
     }
 
     public entry fun add_suimon_to_battle(battle: &mut Battle, suimon: Suimon, ctx: &mut TxContext) {
@@ -120,112 +118,5 @@ module suimon::battle {
     }
 
 
-    #[test]
-    fun test_create() {
-        let referree = @0xc0ffee;
-        let coach_a = @0xc0a;
-        let coach_b = @0xc0b;
-        let ctx = tx_context::dummy();
-        let battle = create(coach_a, coach_b, &mut ctx);
 
-
-        transfer::transfer(battle, referree);
-    }
-
-    #[test]
-    fun test_is_participant() {
-        let some_rando = @0xbabe;
-        let coach_a = @0xabcd;
-        let coach_b = @0xdcba;
-
-        let ctx = tx_context::dummy();
-        let battle = create(coach_a, coach_b, &mut ctx);
-        let should_be_true = is_participant(&battle, coach_a);
-        let should_be_false = is_participant(&battle, some_rando);
-
-        assert!(should_be_true == true, 0);
-        assert!(should_be_false == false, 1);
-
-        // todo implement drop behavior.
-        transfer::transfer(battle, some_rando);
-    }
-
-    #[test]
-    fun test_initiate_battle() {
-        use sui::test_scenario;
-
-        let coach_a = @0xabcd;
-        let coach_b = @0xdbca;
-
-        let scenario_val = test_scenario::begin(coach_a);
-        let scenario = &mut scenario_val;
-        {
-            initiate_battle(coach_a, coach_b, test_scenario::ctx(scenario))
-        };
-        test_scenario::next_tx(scenario, coach_b);
-        {
-            let battle = test_scenario::take_shared<Battle>(scenario);
-            assert!(battle.state == 0, 2);
-            test_scenario::return_shared(battle);
-        };
-
-        test_scenario::end(scenario_val);
-    }
-
-    #[test]
-    fun test_accept_battle() {
-        use sui::test_scenario;
-
-        let coach_a = @0xabcd;
-        let coach_b = @0xdbca;
-
-        let scenario_val = test_scenario::begin(coach_a);
-        let scenario = &mut scenario_val;
-        {
-            initiate_battle(coach_a, coach_b, test_scenario::ctx(scenario))
-        };
-        test_scenario::next_tx(scenario, coach_b);
-        {
-            let battle = test_scenario::take_shared<Battle>(scenario);
-            accept_battle(&mut battle, test_scenario::ctx(scenario));
-            assert!(battle.state == 1, 3);
-            test_scenario::return_shared(battle);
-        };
-
-        test_scenario::end(scenario_val);
-    }
-
-    #[test]
-    fun test_decline_battle() {
-        use sui::test_scenario;
-
-        let coach_a = @0xabcd;
-        let coach_b = @0xdbca;
-
-        let scenario_val = test_scenario::begin(coach_a);
-        let scenario = &mut scenario_val;
-        {
-            initiate_battle(coach_a, coach_b, test_scenario::ctx(scenario))
-        };
-        test_scenario::next_tx(scenario, coach_b);
-        {
-            let battle = test_scenario::take_shared<Battle>(scenario);
-            decline_battle(battle, test_scenario::ctx(scenario));
-        };
-        test_scenario::next_tx(scenario, coach_b);
-        {
-            assert!(!test_scenario::has_most_recent_for_sender<Battle>(scenario), 999);
-        };
-
-        test_scenario::end(scenario_val);
-    }
-
-    // #[test]
-    // fun test_add_suimon_to_battle() {
-    //     let rando = @0xc0ffee;
-    //     let coach_a = @0xabcd;
-    //     let coach_b = @0xdbca;
-
-    //     let ctx = tx_context::dummy();
-    // }
 }

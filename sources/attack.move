@@ -7,6 +7,7 @@ module suimon::attack {
         id: UID,
         name: String,
         damage: u64,
+        heal: bool,
     }
 
     fun create(name: String, damage: u64, ctx: &mut TxContext): Attack {
@@ -14,7 +15,7 @@ module suimon::attack {
             id: object::new(ctx),
             name,
             damage,
+            heal: false
         }
     }
-
 }
