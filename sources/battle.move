@@ -16,6 +16,9 @@ module suimon::battle {
     const EInvalidBattleInitiator: u64 = 1000;
     const EInvalidOpponent: u64 = 1001;
     const EInvalidSender: u64 = 1002;
+    const EBattleAlreadyAccepted: u64 = 1003;
+    const EBattleNotInSelectingSuimonState: u64 = 1004;
+
 
     struct Battle has key {
         id: UID,
@@ -81,6 +84,39 @@ module suimon::battle {
         };
 
         battle_accepted(battle);
+    }
+
+    public entry fun decline_battle(battle: Battle, ctx: &mut TxContext) {
+        let sender = tx_context::sender(ctx);
+
+        if (sender != battle.coach_b) {
+            abort(EInvalidSender)
+        };
+        if (battle.state != SETUP) {
+            abort(EBattleAlreadyAccepted)
+        };
+
+        let Battle {id, coach_a: _, coach_b: _, coach_a_suimon, coach_b_suimon, state: _ } = battle;
+
+        vector::destroy_empty(coach_a_suimon);
+        vector::destroy_empty(coach_b_suimon);
+        object::delete(id);
+    }
+
+    public entry fun add_suimon_to_battle(battle: &mut Battle, suimon: Suimon, ctx: &mut TxContext) {
+        let sender = tx_context::sender(ctx);
+
+        if (sender != battle.coach_a && sender != battle.coach_b) {
+            abort(EInvalidSender)
+        };
+        if (battle.state != SELECTING_SUIMON) {
+            abort(EBattleNotInSelectingSuimonState)
+        };
+        if (sender == battle.coach_a) {
+            vector::push_back(&mut battle.coach_a_suimon, suimon);
+        } else {
+            vector::push_back(&mut battle.coach_b_suimon, suimon);
+        }
     }
 
 
@@ -157,6 +193,39 @@ module suimon::battle {
         };
 
         test_scenario::end(scenario_val);
-
     }
+
+    #[test]
+    fun test_decline_battle() {
+        use sui::test_scenario;
+
+        let coach_a = @0xabcd;
+        let coach_b = @0xdbca;
+
+        let scenario_val = test_scenario::begin(coach_a);
+        let scenario = &mut scenario_val;
+        {
+            initiate_battle(coach_a, coach_b, test_scenario::ctx(scenario))
+        };
+        test_scenario::next_tx(scenario, coach_b);
+        {
+            let battle = test_scenario::take_shared<Battle>(scenario);
+            decline_battle(battle, test_scenario::ctx(scenario));
+        };
+        test_scenario::next_tx(scenario, coach_b);
+        {
+            assert!(!test_scenario::has_most_recent_for_sender<Battle>(scenario), 999);
+        };
+
+        test_scenario::end(scenario_val);
+    }
+
+    // #[test]
+    // fun test_add_suimon_to_battle() {
+    //     let rando = @0xc0ffee;
+    //     let coach_a = @0xabcd;
+    //     let coach_b = @0xdbca;
+
+    //     let ctx = tx_context::dummy();
+    // }
 }
