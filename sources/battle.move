@@ -56,6 +56,27 @@ module suimon::battle {
         battle.state == SELECTING_SUIMON
     }
 
+    public fun battle_is_active(battle: &Battle): bool {
+        battle.state == ACTIVE
+    }
+
+    public fun coach_a_suimon_count(battle: &Battle): u64 {
+        vector::length(&battle.coach_a_suimon)
+    }
+
+    public fun coach_a_is_at_capacity(battle: &Battle): bool {
+        coach_a_suimon_count(battle) == suimon_per_coach(battle)
+    }
+
+    public fun coach_b_suimon_count(battle: &Battle): u64 {
+        vector::length(&battle.coach_b_suimon)
+    }
+
+
+    public fun coach_b_is_at_capacity(battle: &Battle): bool {
+        coach_b_suimon_count(battle) == suimon_per_coach(battle)
+    }
+
     public fun suimon_count_for_coach(battle: &Battle, addr: address): u64 {
         assert!(is_participant(battle, addr), EInvalidSender);
 
@@ -64,7 +85,11 @@ module suimon::battle {
         } else {
             vector::length(&battle.coach_b_suimon)
         }
-    }  
+    }
+
+    public fun suimon_per_coach(battle: &Battle): u64 {
+        battle.suimon_per_coach
+    }
 
     public fun commit_battle_accept(self: &mut Battle) {
         assert!(self.state == SETUP, EBattleNotInSetupState);
@@ -115,18 +140,24 @@ module suimon::battle {
     //     ensures battle_state == DECLINED;
     //     aborts_if sender != battle.coach_b;
     // }
-
+// transition state.
     public entry fun add_suimon_to_battle(battle: &mut Battle, suimon: Suimon, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
+        let suimon_per_coach = suimon_per_coach(battle);
 
         assert!(is_participant(battle, sender), EInvalidSender);
         assert!(battle_is_selecting_suimon(battle), EBattleNotInSelectingSuimonState);
-        assert!(suimon_count_for_coach(battle, sender) + 1 <= battle.suimon_per_coach, EInvalidSuimonCountForCoach);
+        assert!(suimon_count_for_coach(battle, sender) + 1 <= suimon_per_coach, EInvalidSuimonCountForCoach);
 
         if (sender == battle.coach_a) {
             vector::push_back(&mut battle.coach_a_suimon, suimon);
         } else {
             vector::push_back(&mut battle.coach_b_suimon, suimon);
-        }
+        };
+
+        if (coach_a_is_at_capacity(battle) && coach_b_is_at_capacity(battle)) {
+            // TODO: create state transition functions.
+            battle.state = ACTIVE;
+        };
     }
 }
