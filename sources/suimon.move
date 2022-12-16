@@ -37,7 +37,11 @@ module suimon::suimon {
         self.remaining_attack_uses
     }
 
-    public(friend) fun create(hp: u64, attack_power: u64, attack_uses: u8, ctx: &mut TxContext): Suimon {
+    // TODO: Modify this function to use the capability pattern.
+    // it should take SuimonCreateCap<T> as an argument.
+    //
+    // TODO: Find out how to make a test module a friend module.
+    public fun create(hp: u64, attack_power: u64, attack_uses: u8, ctx: &mut TxContext): Suimon {
         Suimon {
             id: object::new(ctx),
             remaining_hp: hp,
