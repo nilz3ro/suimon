@@ -5,6 +5,9 @@ module suimon::suimon {
     friend suimon::hatchery;
     friend suimon::battle;
 
+    const EAttackWithZeroRemainingHP: u64 = 0;
+    const EAttackWithZeroRemainingAttackUses: u64 = 1;
+
     struct Suimon has key, store {
         id: UID,
         hp: u64,
@@ -13,9 +16,6 @@ module suimon::suimon {
         attack_uses: u8,
         remaining_attack_uses: u8,
     }
-
-    const EAttackWithZeroRemainingHP: u64 = 0;
-    const EAttackWithZeroRemainingAttackUses: u64 = 1;
 
     public fun hp(self: &Suimon): u64 {
         self.hp
@@ -41,11 +41,7 @@ module suimon::suimon {
         self.remaining_hp == 0
     }
 
-    // TODO: Modify this function to use the capability pattern.
-    // it should take SuimonCreateCap<T> as an argument.
-    //
-    // TODO: Find out how to make a test module a friend module.
-    public fun create(hp: u64, attack_power: u64, attack_uses: u8, ctx: &mut TxContext): Suimon {
+    public(friend) fun create(hp: u64, attack_power: u64, attack_uses: u8, ctx: &mut TxContext): Suimon {
         Suimon {
             id: object::new(ctx),
             remaining_hp: hp,
@@ -63,25 +59,21 @@ module suimon::suimon {
     }
 
     public(friend) fun use_attack(self: &mut Suimon): u64 {
-        if (self.remaining_hp == 0) {
-            abort(EAttackWithZeroRemainingHP)
-        };
-        if (self.remaining_attack_uses == 0) {
-            abort(EAttackWithZeroRemainingAttackUses)
-        };
+        assert!(self.remaining_hp > 0, EAttackWithZeroRemainingHP);
+        assert!(self.remaining_attack_uses > 0, EAttackWithZeroRemainingAttackUses);
 
         self.remaining_attack_uses = self.remaining_attack_uses - 1;
         self.attack_power
     } 
 
 
-    public(friend) fun heal(self: &mut Suimon, amount: u64) {
-        self.remaining_hp = self.remaining_hp + amount;
-    }
+    // public(friend) fun heal(self: &mut Suimon, amount: u64) {
+    //     self.remaining_hp = self.remaining_hp + amount;
+    // }
 
-    public(friend) fun full_heal(self: &mut Suimon) {
-        self.remaining_hp = self.hp;
-    }
+    // public(friend) fun full_heal(self: &mut Suimon) {
+    //     self.remaining_hp = self.hp;
+    // }
 
     #[test]
     fun test_create_suimon() {

@@ -79,8 +79,20 @@ module suimon::battle {
         battle.state == ACTIVE
     }
 
+    public fun battle_is_finished(battle: &Battle): bool {
+        battle.state == FINISHED
+    }
+
     public fun coach_a_suimon_count(battle: &Battle): u64 {
         vector::length(&battle.coach_a_suimon)
+    }
+
+    public fun coach_a_suimon_borrow_mut(battle: &mut Battle): &mut vector<Suimon> {
+        &mut battle.coach_a_suimon
+    }
+
+    public fun coach_b_suimon_borrow_mut(battle: &mut Battle): &mut vector<Suimon> {
+        &mut battle.coach_b_suimon
     }
 
     public fun coach_a_is_at_capacity(battle: &Battle): bool {
@@ -123,6 +135,51 @@ module suimon::battle {
         self.state = DECLINED;
     }
 
+    public fun all_suimon_fainted(self: &mut Battle, coach: address): bool {
+        assert!(is_participant(self, coach), EInvalidSender);
+        assert!(self.state == ACTIVE, EBattleNotInActiveState);
+
+        let suimon_per_coach = suimon_per_coach(self);
+        let coach_is_coach_a = is_coach_a(self, coach);
+
+        let num_visited: u64 = 0;
+        let num_fainted: u64 = 0;
+
+        if (coach_is_coach_a) {
+            // TODO: extract this into a function
+            let coach_a_suimon_mut = coach_a_suimon_borrow_mut(self);
+            while (num_visited < suimon_per_coach) {
+                let suimon_being_inspected = vector::remove<Suimon>(coach_a_suimon_mut, num_visited);
+
+                if (suimon::is_fainted(&suimon_being_inspected)) {
+                    num_fainted = num_fainted + 1;
+                };
+                vector::push_back(coach_a_suimon_mut, suimon_being_inspected);
+
+                num_visited = num_visited + 1;
+            };
+        } else {
+            let coach_b_suimon_mut = coach_b_suimon_borrow_mut(self);
+            while (num_visited < suimon_per_coach) {
+                let suimon_being_inspected = vector::remove<Suimon>(coach_b_suimon_mut, num_visited);
+
+                if (suimon::is_fainted(&suimon_being_inspected)) {
+                    num_fainted = num_fainted + 1;
+                };
+                vector::push_back(coach_b_suimon_mut, suimon_being_inspected);
+
+                num_visited = num_visited + 1;
+            };
+        };
+
+        if (num_fainted == num_visited) {
+            self.state = FINISHED;
+            true
+        } else {
+            false
+        }
+    }
+
     // the battle object is shared so coach a and coach b can both interact with it (write to it).
     // we need to ensure that only coach a or coach b are allowed to engage with the battle object,
     // and that only coach a may write to coach a suimon and that only coach b may write to coach b suimon.
@@ -154,15 +211,6 @@ module suimon::battle {
         commit_battle_decline(battle);
     }
 
-    // TODO: Figure out how specs work here.
-    // spec decline_battle {
-    //     let battle_state = battle.state;
-    //     let sender = ctx.sender;
-
-    //     ensures battle_state == DECLINED;
-    //     aborts_if sender != battle.coach_b;
-    // }
-
     public entry fun add_suimon_to_battle(battle: &mut Battle, suimon: Suimon, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
         let suimon_per_coach = suimon_per_coach(battle);
@@ -188,7 +236,6 @@ module suimon::battle {
     // that each coach mutates to add their attack or item to the turn.
     // after the turn is processed, a turn summary will be created and added to the battle.
     public entry fun take_turn(battle: &mut Battle, source_suimon_idx: u64, target_suimon_idx: u64, ctx: &mut TxContext) {
-        // use std::debug;
         let sender = tx_context::sender(ctx);
 
         assert!(is_participant(battle, sender), EInvalidSender);
@@ -196,7 +243,6 @@ module suimon::battle {
         assert!(last_turn_taken_by(battle) != option::some(sender), EInvalidSender);
 
         let sender_is_coach_a = is_coach_a(battle, sender);
-        // let sender_is_coach_b = is_coach_b(battle, sender);
 
         let source_suimon = if (sender_is_coach_a) {
             vector::remove(&mut battle.coach_a_suimon, source_suimon_idx)
@@ -212,16 +258,13 @@ module suimon::battle {
 
         // make a suimon attack another suimon
         suimon::attack(&mut source_suimon, &mut target_suimon);
-
-        // debug::print(&mut source_suimon);
-        // debug::print(&mut target_suimon);
-
         // TODO: If the target suimon has fainted, emit an event.
         // if (suimon::is_fainted(&target_suimon)) {
         //     abort(1111)
         // };
 
         // finally, return the suimon to their respective vectors.
+        // TODO: preserve the order of the suimon in the vectors.
         if (sender_is_coach_a) {
             vector::push_back(&mut battle.coach_a_suimon, source_suimon);
             vector::push_back(&mut battle.coach_b_suimon, target_suimon);
@@ -231,7 +274,5 @@ module suimon::battle {
         };
 
         battle.last_turn_taken_by = option::some(sender); 
-
-        // debug::print(battle);
     }
 }

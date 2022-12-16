@@ -1,10 +1,14 @@
 #[test_only]
 module suimon::battle_tests {
+    use std::vector;
+
     use sui::test_scenario;
     use sui::tx_context;
     use sui::transfer;
+
     use suimon::battle::{Self, Battle};
     use suimon::suimon::{Self, Suimon};
+    use suimon::hatchery::{Self, CreateCap};
     
     #[test]
     fun test_create() {
@@ -118,15 +122,18 @@ module suimon::battle_tests {
         };
         test_scenario::next_tx(scenario, coach_a);
         {
-            let coach_a_suimon_1 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_a_suimon_2 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_a_suimon_3 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_a_suimon_4 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
+            hatchery::grant_create_cap(test_scenario::ctx(scenario));
+        };
+        test_scenario::next_tx(scenario, coach_a);
+        {
+            let create_cap = test_scenario::take_from_sender<CreateCap>(scenario);
+            
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
 
-            transfer::transfer(coach_a_suimon_1, coach_a);
-            transfer::transfer(coach_a_suimon_2, coach_a);
-            transfer::transfer(coach_a_suimon_3, coach_a);
-            transfer::transfer(coach_a_suimon_4, coach_a);
+            test_scenario::return_to_sender(scenario, create_cap);
         };
         test_scenario::next_tx(scenario, coach_a);
         {
@@ -176,22 +183,21 @@ module suimon::battle_tests {
         };
         test_scenario::next_tx(scenario, coach_a);
         {
-            let coach_a_suimon_1 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_a_suimon_2 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_a_suimon_3 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
+            hatchery::grant_create_cap(test_scenario::ctx(scenario));
+        };
+        test_scenario::next_tx(scenario, coach_a);
+        {
+            let create_cap = test_scenario::take_from_sender<CreateCap>(scenario);
 
-            transfer::transfer(coach_a_suimon_1, coach_a);
-            transfer::transfer(coach_a_suimon_2, coach_a);
-            transfer::transfer(coach_a_suimon_3, coach_a);
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
 
-            let coach_b_suimon_1 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_b_suimon_2 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_b_suimon_3 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_b, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_b, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_b, test_scenario::ctx(scenario));
 
-
-            transfer::transfer(coach_b_suimon_1, coach_b);
-            transfer::transfer(coach_b_suimon_2, coach_b);
-            transfer::transfer(coach_b_suimon_3, coach_b);
+            test_scenario::return_to_sender(scenario, create_cap);
         };
         test_scenario::next_tx(scenario, coach_a);
         {
@@ -232,7 +238,6 @@ module suimon::battle_tests {
             assert!(battle::battle_is_active(&battle), 1000);
 
             test_scenario::return_shared(battle);
-
         };
 
         test_scenario::end(scenario_val);
@@ -241,7 +246,7 @@ module suimon::battle_tests {
     #[test]
     fun turn_based_attacks() {
         let (coach_a, coach_b, _) = coaches();
-        let suimon_per_coach = 3;
+        let suimon_per_coach = 1;
 
         let scenario_val = test_scenario::begin(coach_a);
         let scenario = &mut scenario_val;
@@ -251,54 +256,37 @@ module suimon::battle_tests {
         test_scenario::next_tx(scenario, coach_b);
         {
             let battle = test_scenario::take_shared<Battle>(scenario);
+
             battle::accept_battle(&mut battle, test_scenario::ctx(scenario));
             test_scenario::return_shared(battle);
         };
         test_scenario::next_tx(scenario, coach_a);
         {
-            let coach_a_suimon_1 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_a_suimon_2 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_a_suimon_3 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
+            hatchery::grant_create_cap(test_scenario::ctx(scenario));
+        };
+        test_scenario::next_tx(scenario, coach_a);
+        {
+            let create_cap = test_scenario::take_from_sender<CreateCap>(scenario);
 
-            transfer::transfer(coach_a_suimon_1, coach_a);
-            transfer::transfer(coach_a_suimon_2, coach_a);
-            transfer::transfer(coach_a_suimon_3, coach_a);
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_b, test_scenario::ctx(scenario));
 
-            let coach_b_suimon_1 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_b_suimon_2 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-            let coach_b_suimon_3 =  suimon::create(100, 100, 10, test_scenario::ctx(scenario));
-
-
-            transfer::transfer(coach_b_suimon_1, coach_b);
-            transfer::transfer(coach_b_suimon_2, coach_b);
-            transfer::transfer(coach_b_suimon_3, coach_b);
+            test_scenario::return_to_sender(scenario, create_cap);
         };
         test_scenario::next_tx(scenario, coach_a);
         {
             let battle = test_scenario::take_shared<Battle>(scenario);
-
             let suimon_1 = test_scenario::take_from_sender<Suimon>(scenario);
-            let suimon_2 = test_scenario::take_from_sender<Suimon>(scenario);
-            let suimon_3 = test_scenario::take_from_sender<Suimon>(scenario);
 
             battle::add_suimon_to_battle(&mut battle, suimon_1, test_scenario::ctx(scenario));
-            battle::add_suimon_to_battle(&mut battle, suimon_2, test_scenario::ctx(scenario));
-            battle::add_suimon_to_battle(&mut battle, suimon_3, test_scenario::ctx(scenario));
-
             test_scenario::return_shared(battle);
         };
         test_scenario::next_tx(scenario, coach_b);
         {
             let battle = test_scenario::take_shared<Battle>(scenario);
-
             let suimon_1 = test_scenario::take_from_sender<Suimon>(scenario);
-            let suimon_2 = test_scenario::take_from_sender<Suimon>(scenario);
-            let suimon_3 = test_scenario::take_from_sender<Suimon>(scenario);
 
             battle::add_suimon_to_battle(&mut battle, suimon_1, test_scenario::ctx(scenario));
-            battle::add_suimon_to_battle(&mut battle, suimon_2, test_scenario::ctx(scenario));
-            battle::add_suimon_to_battle(&mut battle, suimon_3, test_scenario::ctx(scenario));
-
             test_scenario::return_shared(battle);
         };
         test_scenario::next_tx(scenario, coach_a);
@@ -320,15 +308,104 @@ module suimon::battle_tests {
 
             let coach_a_suimon_index = 0;
             let coach_b_suimon_index = 0;
-            //battle: &mut Battle, source_suimon_idx: u64, target_suimon_idx: u64, ctx: &mut TxContext
 
             battle::take_turn(&mut battle, coach_a_suimon_index, coach_b_suimon_index, test_scenario::ctx(scenario));
-
             test_scenario::return_shared(battle);
         };
 
         test_scenario::end(scenario_val);
        
+    }
+
+    #[test]
+    fun test_suimon_fainting() {
+        let (coach_a, coach_b, _) = coaches();
+        let suimon_per_coach = 1;
+
+        let scenario_val = test_scenario::begin(coach_a);
+        let scenario = &mut scenario_val;
+        {
+            battle::initiate_battle(coach_a, coach_b, suimon_per_coach, test_scenario::ctx(scenario))
+        };
+        test_scenario::next_tx(scenario, coach_b);
+        {
+            let battle = test_scenario::take_shared<Battle>(scenario);
+
+            battle::accept_battle(&mut battle, test_scenario::ctx(scenario));
+            test_scenario::return_shared(battle);
+        };
+        test_scenario::next_tx(scenario, coach_a);
+        {
+            hatchery::grant_create_cap(test_scenario::ctx(scenario));
+        };
+        test_scenario::next_tx(scenario, coach_a);
+        {
+            let create_cap = test_scenario::take_from_sender<CreateCap>(scenario);
+
+            hatchery::hatch_suimon(&create_cap, coach_a, test_scenario::ctx(scenario));
+            hatchery::hatch_suimon(&create_cap, coach_b, test_scenario::ctx(scenario));
+
+            test_scenario::return_to_sender(scenario, create_cap);
+        };
+        test_scenario::next_tx(scenario, coach_a);
+        {
+            let battle = test_scenario::take_shared<Battle>(scenario);
+            let suimon_1 = test_scenario::take_from_sender<Suimon>(scenario);
+
+            battle::add_suimon_to_battle(&mut battle, suimon_1, test_scenario::ctx(scenario));
+            test_scenario::return_shared(battle);
+        };
+        test_scenario::next_tx(scenario, coach_b);
+        {
+            let battle = test_scenario::take_shared<Battle>(scenario);
+            let suimon_1 = test_scenario::take_from_sender<Suimon>(scenario);
+
+            battle::add_suimon_to_battle(&mut battle, suimon_1, test_scenario::ctx(scenario));
+            test_scenario::return_shared(battle);
+        };
+        test_scenario::next_tx(scenario, coach_a);
+        {
+            let battle = test_scenario::take_shared<Battle>(scenario);
+            let coach_a_suimon_count = battle::coach_a_suimon_count(&battle);
+            let coach_b_suimon_count = battle::coach_b_suimon_count(&battle);
+
+            assert!(coach_a_suimon_count == battle::suimon_per_coach(&battle), 998);
+            assert!(coach_b_suimon_count == battle::suimon_per_coach(&battle), 999);
+            assert!(battle::battle_is_active(&battle), 1000);
+
+            test_scenario::return_shared(battle);
+        };
+        test_scenario::next_tx(scenario, coach_b);
+        {
+            let battle = test_scenario::take_shared<Battle>(scenario);
+            let coach_a_suimon_index = 0;
+            let coach_b_suimon_index = 0;
+
+            battle::take_turn(&mut battle, coach_a_suimon_index, coach_b_suimon_index, test_scenario::ctx(scenario));
+            test_scenario::return_shared(battle);
+        };
+        test_scenario::next_tx(scenario, coach_b);
+        {
+            let battle = test_scenario::take_shared<Battle>(scenario);
+            let coach_a_suimon_mut = battle::coach_a_suimon_borrow_mut(&mut battle);
+            let maybe_fainted_suimon = vector::remove<Suimon>(coach_a_suimon_mut, 0);
+
+            // we perform this assertion here because we need to put the suimon back in the battle vector
+            // so that we can check if the battle is finished
+            assert!(suimon::is_fainted(&maybe_fainted_suimon), 909);
+            vector::push_back(coach_a_suimon_mut, maybe_fainted_suimon);
+
+            let all_coach_a_suimon_fainted = battle::all_suimon_fainted(&mut battle, coach_a);
+            let battle_is_finished = battle::battle_is_finished(&battle);
+
+            assert!(all_coach_a_suimon_fainted, 910);
+            assert!(battle_is_finished, 911);
+
+
+            test_scenario::return_shared(battle);
+        };
+
+        test_scenario::end(scenario_val);
     }
 
     fun coaches(): (address, address, address) {
