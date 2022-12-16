@@ -37,6 +37,10 @@ module suimon::suimon {
         self.remaining_attack_uses
     }
 
+    public fun is_fainted(self: &Suimon): bool {
+        self.remaining_hp == 0
+    }
+
     // TODO: Modify this function to use the capability pattern.
     // it should take SuimonCreateCap<T> as an argument.
     //
@@ -79,43 +83,50 @@ module suimon::suimon {
         self.remaining_hp = self.hp;
     }
 
-    // #[test]
-    // fun test_create_suimon() {
-    //     use sui::test_scenario;
+    #[test]
+    fun test_create_suimon() {
+        use sui::test_scenario;
+        use sui::transfer;
 
-    //     let creator = @0xc0ffee;
 
-    //     let scenario_val = test_scenario::begin(creator);
-    //     let scenario = &mut scenario_val;
-    //     {
-    //         create_suimon(100, 100, 10, test_scenario::ctx(scenario));
-    //     };
+        use suimon::suimon;
 
-    //     // make sure newly created suimon belongs to creator;
-    //     test_scenario::next_tx(scenario, creator);
-    //     {
-    //         let s = test_scenario::take_from_sender<Suimon>(scenario);
-    //         assert!(s.hp == 100 && s.remaining_hp == 100, 0);
-    //         test_scenario::return_to_sender(scenario, s);
-    //     };
+        let creator = @0xc0ffee;
 
-    //     test_scenario::end(scenario_val);
-    // }
+        let scenario_val = test_scenario::begin(creator);
+        let scenario = &mut scenario_val;
+        {
+            let suimon_1 = suimon::create(100, 100, 10, test_scenario::ctx(scenario));
+            assert!(suimon_1.hp == 100 && suimon_1.remaining_hp == 100, 0); 
+            transfer::transfer(suimon_1, creator);
+        };
 
-    // #[test]
-    // fun test_attack() {
-    //     use sui::tx_context;
+        // make sure newly created suimon belongs to creator;
+        test_scenario::next_tx(scenario, creator);
+        {
+            let s = test_scenario::take_from_sender<Suimon>(scenario);
+            assert!(s.hp == 100 && s.remaining_hp == 100, 0);
+            test_scenario::return_to_sender(scenario, s);
+        };
 
-    //     let receiver = @0xc0ffee;
+        test_scenario::end(scenario_val);
+    }
 
-    //     let ctx = tx_context::dummy();
-    //     let suimon = create(100, 100, 10, &mut ctx);
-    //     let another_suimon = create(100, 100, 10, &mut ctx);
+    #[test]
+    fun test_attack() {
+        use sui::tx_context;
+        use sui::transfer;
 
-    //     attack(&mut suimon, &mut another_suimon);
-    //     assert!(another_suimon.remaining_hp == 0, 0);
+        let receiver = @0xc0ffee;
 
-    //     transfer::transfer(suimon, receiver);
-    //     transfer::transfer(another_suimon, receiver);
-    // }
+        let ctx = tx_context::dummy();
+        let suimon = create(100, 100, 10, &mut ctx);
+        let another_suimon = create(100, 100, 10, &mut ctx);
+
+        attack(&mut suimon, &mut another_suimon);
+        assert!(another_suimon.remaining_hp == 0, 0);
+
+        transfer::transfer(suimon, receiver);
+        transfer::transfer(another_suimon, receiver);
+    }
 }

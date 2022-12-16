@@ -10,6 +10,7 @@ module suimon::attack {
         heal: bool,
     }
 
+    // TODO: attach attacks to suimon with object tables
     fun create(name: String, damage: u64, ctx: &mut TxContext): Attack {
         Attack {
             id: object::new(ctx),
