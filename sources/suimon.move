@@ -1,6 +1,7 @@
 module suimon::suimon {
     use sui::object::{Self, UID};
     use sui::tx_context::TxContext;
+    use sui::url::{Self, Url};
 
     friend suimon::hatchery;
     friend suimon::battle;
@@ -15,6 +16,7 @@ module suimon::suimon {
         attack_power: u64, 
         attack_uses: u8,
         remaining_attack_uses: u8,
+        url: Url
     }
 
     public fun hp(self: &Suimon): u64 {
@@ -41,7 +43,13 @@ module suimon::suimon {
         self.remaining_hp == 0
     }
 
-    public(friend) fun create(hp: u64, attack_power: u64, attack_uses: u8, ctx: &mut TxContext): Suimon {
+    public(friend) fun create(
+        hp: u64,
+        attack_power: u64,
+        attack_uses: u8,
+        url_bytes: vector<u8>,
+        ctx: &mut TxContext
+    ): Suimon {
         Suimon {
             id: object::new(ctx),
             remaining_hp: hp,
@@ -49,6 +57,7 @@ module suimon::suimon {
             attack_power,
             remaining_attack_uses: attack_uses,
             attack_uses,
+            url: url::new_unsafe_from_bytes(url_bytes)
         }
     }
 
@@ -88,7 +97,7 @@ module suimon::suimon {
         let scenario_val = test_scenario::begin(creator);
         let scenario = &mut scenario_val;
         {
-            let suimon_1 = suimon::create(100, 100, 10, test_scenario::ctx(scenario));
+            let suimon_1 = suimon::create(100, 100, 10, b"http://example.com", test_scenario::ctx(scenario));
             assert!(suimon_1.hp == 100 && suimon_1.remaining_hp == 100, 0); 
             transfer::transfer(suimon_1, creator);
         };
@@ -112,8 +121,8 @@ module suimon::suimon {
         let receiver = @0xc0ffee;
 
         let ctx = tx_context::dummy();
-        let suimon = create(100, 100, 10, &mut ctx);
-        let another_suimon = create(100, 100, 10, &mut ctx);
+        let suimon = create(100, 100, 10, b"http://example.com", &mut ctx);
+        let another_suimon = create(100, 100, 10, b"http://example.com", &mut ctx);
 
         attack(&mut suimon, &mut another_suimon);
         assert!(another_suimon.remaining_hp == 0, 0);

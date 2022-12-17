@@ -66,6 +66,16 @@ module suimon::battle {
         self.coach_b == addr
     }
 
+    public fun opponent(self: &Battle, addr: address): address {
+        assert!(is_participant(self, addr), EInvalidSender);
+
+        if (addr == self.coach_a) {
+            self.coach_b
+        } else {
+            self.coach_a
+        }
+    }
+
     public fun is_participant(self: &Battle, addr: address): bool {
         // self.coach_a == addr || self.coach_b == addr
         is_coach_a(self, addr) || is_coach_b(self, addr)
@@ -137,7 +147,6 @@ module suimon::battle {
 
     public fun all_suimon_fainted(self: &mut Battle, coach: address): bool {
         assert!(is_participant(self, coach), EInvalidSender);
-        assert!(self.state == ACTIVE, EBattleNotInActiveState);
 
         let suimon_per_coach = suimon_per_coach(self);
         let coach_is_coach_a = is_coach_a(self, coach);
@@ -172,12 +181,7 @@ module suimon::battle {
             };
         };
 
-        if (num_fainted == num_visited) {
-            self.state = FINISHED;
-            true
-        } else {
-            false
-        }
+        num_fainted == num_visited
     }
 
     // the battle object is shared so coach a and coach b can both interact with it (write to it).
@@ -237,6 +241,7 @@ module suimon::battle {
     // after the turn is processed, a turn summary will be created and added to the battle.
     public entry fun take_turn(battle: &mut Battle, source_suimon_idx: u64, target_suimon_idx: u64, ctx: &mut TxContext) {
         let sender = tx_context::sender(ctx);
+        let opponent = opponent(battle, sender);
 
         assert!(is_participant(battle, sender), EInvalidSender);
         assert!(battle_is_active(battle), EBattleNotInActiveState);
@@ -274,5 +279,9 @@ module suimon::battle {
         };
 
         battle.last_turn_taken_by = option::some(sender); 
+
+        if (all_suimon_fainted(battle, opponent)) {
+            battle.state = FINISHED;
+        };
     }
 }

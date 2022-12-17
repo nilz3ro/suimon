@@ -395,8 +395,8 @@ module suimon::battle_tests {
             assert!(suimon::is_fainted(&maybe_fainted_suimon), 909);
             vector::push_back(coach_a_suimon_mut, maybe_fainted_suimon);
 
-            let all_coach_a_suimon_fainted = battle::all_suimon_fainted(&mut battle, coach_a);
             let battle_is_finished = battle::battle_is_finished(&battle);
+            let all_coach_a_suimon_fainted = battle::all_suimon_fainted(&mut battle, coach_a);
 
             assert!(all_coach_a_suimon_fainted, 910);
             assert!(battle_is_finished, 911);
