@@ -14,7 +14,7 @@ module suimon::battle_tests {
     fun test_create() {
         let (coach_a, coach_b, referree) = coaches();
         let ctx = tx_context::dummy();
-        let battle = battle::create(coach_a, coach_b, 3, &mut ctx);
+        let battle = battle::create_battle(coach_a, coach_b, 3, &mut ctx);
 
         transfer::transfer(battle, referree);
     }
@@ -25,7 +25,7 @@ module suimon::battle_tests {
         let suimon_per_coach = 3;
 
         let ctx = tx_context::dummy();
-        let battle = battle::create(coach_a, coach_b, suimon_per_coach, &mut ctx);
+        let battle = battle::create_battle(coach_a, coach_b, suimon_per_coach, &mut ctx);
         let should_be_true = battle::is_participant(&battle, coach_a);
         let should_be_false = battle::is_participant(&battle, other);
 
@@ -403,6 +403,20 @@ module suimon::battle_tests {
 
 
             test_scenario::return_shared(battle);
+        };
+        test_scenario::next_tx(scenario, coach_a);
+        {
+            // use std::debug;
+            // find out if the battle has been destroyed or not.
+            let battle = test_scenario::take_shared<Battle>(scenario);
+
+            // debug::print(&battle);
+
+            battle::return_suimon_to_coaches(&mut battle);
+            // battle::finish_battle(battle, test_scenario::ctx(scenario));
+            test_scenario::return_shared(battle);
+
+
         };
 
         test_scenario::end(scenario_val);

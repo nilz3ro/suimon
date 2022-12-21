@@ -45,7 +45,15 @@ module suimon::battle {
         state: u8,
     }
 
-    public fun create(coach_a: address, coach_b: address, suimon_per_coach: u64, ctx: &mut TxContext): Battle {
+    struct BattleSummary has key {
+        id: UID,
+        coach_a: address,
+        coach_b: address,
+        suimon_per_coach: u64,
+        winner: address
+    }
+
+    public fun create_battle(coach_a: address, coach_b: address, suimon_per_coach: u64, ctx: &mut TxContext): Battle {
         Battle {
             id: object::new(ctx),
             coach_a,
@@ -55,6 +63,16 @@ module suimon::battle {
             coach_b_suimon: vector::empty(),
             last_turn_taken_by: option::none(),
             state: SETUP,
+        }
+    }
+
+    fun create_battle_summary(battle: &Battle, winner: address, ctx: &mut TxContext): BattleSummary {
+        BattleSummary {
+            id: object::new(ctx),
+            coach_a: battle.coach_a,
+            coach_b: battle.coach_b,
+            suimon_per_coach: battle.suimon_per_coach,
+            winner,
         }
     }
 
@@ -184,6 +202,23 @@ module suimon::battle {
         num_fainted == num_visited
     }
 
+    public fun return_suimon_to_coaches(self: &mut Battle) {
+        let coach_a = self.coach_a;
+        let coach_a_suimon_mut = coach_a_suimon_borrow_mut(self);
+
+        while (vector::length(coach_a_suimon_mut) > 0) {
+            let suimon_being_returned = vector::pop_back(coach_a_suimon_mut);
+            transfer::transfer(suimon_being_returned, coach_a);
+        };
+
+        let coach_b = self.coach_b;
+        let coach_b_suimon_mut = coach_b_suimon_borrow_mut(self);
+        while (vector::length(coach_b_suimon_mut) > 0) {
+            let suimon_being_returned = vector::pop_back(coach_b_suimon_mut);
+            transfer::transfer(suimon_being_returned, coach_b);
+        };
+    }
+
     // the battle object is shared so coach a and coach b can both interact with it (write to it).
     // we need to ensure that only coach a or coach b are allowed to engage with the battle object,
     // and that only coach a may write to coach a suimon and that only coach b may write to coach b suimon.
@@ -195,7 +230,7 @@ module suimon::battle {
         assert!(sender == coach_a, EInvalidBattleInitiator);
         assert!(coach_a != coach_b, EInvalidBattleInitiator);
 
-        let battle = create(coach_a, coach_b, suimon_per_coach, ctx);
+        let battle = create_battle(coach_a, coach_b, suimon_per_coach, ctx);
         transfer::share_object(battle);
     }
 
@@ -283,5 +318,38 @@ module suimon::battle {
         if (all_suimon_fainted(battle, opponent)) {
             battle.state = FINISHED;
         };
+    }
+
+    // TODO: wait until the Mysten team has finished the PR that allows shared
+    // objects to be deleted.
+    public entry fun finish_battle(battle: Battle, ctx: &mut TxContext) {
+        use std::debug;
+
+        let sender = tx_context::sender(ctx);
+
+        assert!(is_participant(&battle, sender), EInvalidSender);
+        assert!(battle_is_finished(&battle), EBattleNotInFinishedState);
+
+        // return_suimon_to_coaches(&mut battle);
+
+        let Battle {id, coach_a: _, coach_b: _, suimon_per_coach: _, coach_a_suimon, coach_b_suimon, last_turn_taken_by: _, state: _ } = battle;
+        // return_suimon_to_coaches(&mut battle);
+
+
+        // TODO: before we destroy the battle object,
+        // let's create an immutable digest of the battle called BattleSummary.
+
+        let coach_a_suimon_length = vector::length(&coach_a_suimon);
+        let coach_b_suimon_length = vector::length(&coach_b_suimon);
+
+        debug::print(&coach_a_suimon_length);
+        debug::print(&coach_b_suimon_length);
+
+        vector::destroy_empty(coach_a_suimon);
+        vector::destroy_empty(coach_b_suimon);
+
+        object::delete(id);
+
+        
     }
 }
